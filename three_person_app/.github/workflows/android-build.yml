@@ -1,0 +1,61 @@
+name: 🛠 Android CI / Build & Release APK
+
+on:
+  push:
+    branches: [ main, master, upgrade ]
+    tags:    [ 'v*.*.*' ]
+  pull_request:
+    branches: [ main, master, upgrade ]
+
+permissions:
+  contents: write   # needed to create Releases & upload assets
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_and_release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📂 Checkout code
+        uses: actions/checkout@v6
+
+      - name: ☕️ Setup Java (Temurin 17)
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 🦋 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true          # caches the SDK and pub-cache for you
+
+      - name: 📥 Get dependencies
+        run: flutter pub get
+
+      - name: ✅ Run tests
+        run: flutter test
+
+      - name: 🏗️ Build APK
+        run: flutter build apk --release
+
+      # Downloadable from the run's summary page, every build.
+      - name: 📦 Upload APK as build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-apk
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      # Only on version tags: attach the APK to a GitHub Release.
+      - name: 🚀 Attach APK to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/app/outputs/flutter-apk/*.apk
+          generate_release_notes: true
