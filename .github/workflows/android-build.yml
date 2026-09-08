@@ -1,3 +1,56 @@
-defaults:
-      run:
-        working-directory: 4330-three-person-app/three_person_app
+name: Android CI
+
+on:
+  push:
+    branches: [ main, master, upgrade ]
+  pull_request:
+    branches: [ main, master, upgrade ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Locate Flutter project
+        id: find
+        run: |
+          DIR=$(dirname "$(find . -name pubspec.yaml -not -path '*/build/*' -not -path '*/.dart_tool/*' | head -1)")
+          echo "Found Flutter project at: $DIR"
+          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        working-directory: ${{ steps.find.outputs.dir }}
+        run: flutter pub get
+
+      - name: Run tests
+        working-directory: ${{ steps.find.outputs.dir }}
+        run: flutter test
+
+      - name: Build APK
+        working-directory: ${{ steps.find.outputs.dir }}
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-apk
+          path: ${{ steps.find.outputs.dir }}/build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
