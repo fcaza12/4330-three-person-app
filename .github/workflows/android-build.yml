@@ -1,0 +1,3 @@
+defaults:
+      run:
+        working-directory: 4330-three-person-app/three_person_app
